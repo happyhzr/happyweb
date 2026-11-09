@@ -3,6 +3,7 @@ package happyweb
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 type HandlerFunc func(*Context)
@@ -39,7 +40,14 @@ func (e *Engine) Run(addr string) error {
 }
 
 func (e *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	middlewares := []HandlerFunc{}
+	for _, group := range e.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
 	c := newContext(w, req)
+	c.handlers = middlewares
 	e.router.handle(c)
 }
 
@@ -73,4 +81,8 @@ func (rg *RouterGroup) GET(pattern string, handler HandlerFunc) {
 
 func (rg *RouterGroup) POST(pattern string, handler HandlerFunc) {
 	rg.addRoute("POST", pattern, handler)
+}
+
+func (rg *RouterGroup) Use(middlewares ...HandlerFunc) {
+	rg.middlewares = append(rg.middlewares, middlewares...)
 }

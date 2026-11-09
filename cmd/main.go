@@ -1,35 +1,50 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
+	"text/template"
 	"time"
 
 	"github.com/happyhzr/happyweb"
 )
 
-func main() {
-	r := happyweb.New()
-
-	r.GET("/", func(c *happyweb.Context) {
-		c.HTML(http.StatusOK, "<h1>Hello happyweb</h1>")
-	})
-
-	v2 := r.Group("/v2")
-	v2.Use(onlyForV2())
-	{
-		v2.GET("/hello/:name", func(c *happyweb.Context) {
-			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
-		})
-	}
-
-	r.Run(":9999")
+type Student struct {
+	Name string
+	Age  int
 }
 
-func onlyForV2() happyweb.HandlerFunc {
-	return func(c *happyweb.Context) {
-		t := time.Now()
-		c.Fail(500, "Internal Server Error")
-		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
-	}
+func FormatAsDate(t time.Time) string {
+	year, month, day := t.Date()
+	return fmt.Sprintf("%d-%02d-%02d", year, month, day)
+}
+
+func main() {
+	r := happyweb.New()
+	r.Use(happyweb.Logger())
+	r.SetFuncMap(template.FuncMap{
+		"FormatAsDate": FormatAsDate,
+	})
+	r.LoadHTMLGlob("templates/*")
+	r.Static("/assets", "./static")
+
+	stu1 := &Student{Name: "happyhzr", Age: 18}
+	stu2 := &Student{Name: "hzr", Age: 18}
+	r.GET("/", func(c *happyweb.Context) {
+		c.HTML(http.StatusOK, "css.tmpl", nil)
+	})
+	r.GET("/students", func(c *happyweb.Context) {
+		c.HTML(http.StatusOK, "arr.tmpl", happyweb.H{
+			"title":  "happyweb",
+			"stuArr": []*Student{stu1, stu2},
+		})
+	})
+	r.GET("/date", func(c *happyweb.Context) {
+		c.HTML(http.StatusOK, "custom_func.tmpl", happyweb.H{
+			"title": "happyweb",
+			"now":   time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC),
+		})
+	})
+
+	r.Run(":9999")
 }
